@@ -1,0 +1,117 @@
+
+import ddf.minim.*;
+String fileName = "2.mp3";
+String dataFileName = "data/cue1.json";
+Minim minim;
+AudioPlayer player;
+
+CueHelper helper;
+float trigger = 0;
+class Cue {
+  float time;
+  Cue(float _t) {
+    time = _t;
+  }
+  String toString() {
+    return "Cue at:" + time;
+  }
+}
+class CueHelper {
+  float startTime = 0;
+  ArrayList<Cue> cues;
+  CueHelper() {
+    cues = new ArrayList<Cue>();
+  }
+  void AddCue(float t) {
+    cues.add(new Cue(t));
+    println("add cue", t);
+  }
+
+  Cue GetCueOnTime(float t, float interval) {
+    for (int i = 0; i <cues.size()-1; i++) {
+      Cue c = cues.get(i);
+      Cue nextc = cues.get(i+1);
+      if (c.time < t-interval && nextc.time > t) {
+        return c;
+      }
+    }
+    if (cues.size()>0) {
+      Cue lastCue = cues.get(cues.size()-1);
+      if (lastCue.time <= t) {
+        return lastCue;
+      }
+    }
+    return null;
+  }
+
+  void PlayData(String fileName) {
+    this.cues.clear();
+    JSONObject json; 
+    json = loadJSONObject(fileName);
+    JSONArray cuedata = json.getJSONArray("data");
+    for (int i = 0; i < cuedata.size(); i++) {
+      JSONObject o = cuedata.getJSONObject(i);
+      float t = o.getFloat("time");
+      Cue c = new Cue(t);
+      this.cues.add(c);
+    }
+  }
+
+  void SaveData() {
+
+    JSONObject data;
+
+    data = new JSONObject();
+    JSONArray cuedata = new JSONArray();
+    int i = 0;
+    for (Cue c : helper.cues) {
+      JSONObject o = new JSONObject();
+      o.setFloat("time", c.time);
+      cuedata.setJSONObject(i++, o);
+    }
+    data.setJSONArray("data", cuedata);
+    saveJSONObject(data, dataFileName);
+    println("save", cuedata.size() );
+  }
+}
+void setup() {
+  size(640, 360);
+  helper = new CueHelper();
+  minim = new Minim(this);
+
+  // loadFile will look in all the same places as loadImage does.
+  // this means you can find files that are in the data folder and the 
+  // sketch folder. you can also pass an absolute path, or a URL.
+  player = minim.loadFile(fileName);
+  helper.startTime = millis();
+  player.play();
+
+  helper.PlayData(dataFileName);
+}
+
+void draw() {
+
+  background(255);
+  fill(0);
+  text(player.position()+"/"+player.length(), 30, 30);
+
+  Cue c = helper.GetCueOnTime(player.position(), 1);
+  if (c != null) { 
+    text(c.toString(), 30, 50);
+    trigger += 1;
+  }
+  trigger *= 0.7;
+  float r = 50 *(0.02+trigger);
+  fill(#ff0000, 150);
+  ellipse(width/2, height/2, r, r);
+}
+
+
+void keyPressed() {
+  if (key==' ') {
+    helper.AddCue(player.position());
+  }
+  if (key=='s') {
+    helper.SaveData();
+  }
+}
